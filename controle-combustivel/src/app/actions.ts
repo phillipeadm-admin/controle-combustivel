@@ -63,18 +63,9 @@ export async function addAbastecimento(formData: FormData) {
     let imagemUrl = null;
 
     if (file && file.size > 0) {
-        const fs = await import('fs-extra');
-        const path = await import('path');
-
-        const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-        await fs.ensureDir(uploadDir);
-
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const fileName = `${Date.now()}-${file.name.replace(/\s+/g, "_")}`;
-        const filePath = path.join(uploadDir, fileName);
-
-        await fs.writeFile(filePath, buffer);
-        imagemUrl = `/uploads/${fileName}`;
+        // Bloqueio temporário: A Vercel (produção) não permite salvar arquivos localmente.
+        // Precisamos do Cloudinary para prosseguir com imagens.
+        return { error: "A Nuvem de Fotos (Cloudinary) ainda não foi conectada. Por favor, registre sem foto por enquanto." };
     }
 
     await prisma.abastecimento.create({
