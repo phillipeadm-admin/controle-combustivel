@@ -1,0 +1,43 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Pessoa {
+  id             Int             @id @default(autoincrement())
+  nome           String
+  equipe         String          // ALFA ou BRAVO
+  abastecimentos Abastecimento[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Equipamento {
+  id             Int             @id @default(autoincrement())
+  nome           String
+  abastecimentos Abastecimento[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Abastecimento {
+  id             Int          @id @default(autoincrement())
+  data           DateTime     @default(now())
+  quantidade     Float
+  observacoes    String?
+  imagemUrl      String?      // Caminho da imagem salva
+  
+  pessoa         Pessoa       @relation(fields: [pessoaId], references: [id])
+  pessoaId       Int
+  
+  equipamento    Equipamento  @relation(fields: [equipamentoId], references: [id])
+  equipamentoId  Int
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
