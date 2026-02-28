@@ -6,14 +6,15 @@ import { PlusCircle, Trash2, Users, Wrench, Loader2, Settings, Edit, Save, X } f
 import {
     addPessoa, getPessoas, deletePessoa,
     addEquipamento, getEquipamentos, deleteEquipamento,
-    getAbastecimentos, deleteAbastecimento, updateAbastecimento
+    getAbastecimentos, deleteAbastecimento, updateAbastecimento,
+    verifyAdminPassword, changeAdminPassword, verifyPinAndResetPassword
 } from "@/app/actions";
 
 type Pessoa = { id: number, nome: string, equipe: string };
 type Equipamento = { id: number, nome: string };
 type Abastecimento = {
     id: number, data: Date, quantidade: number, observacoes: string,
-    pessoa: Pessoa, equipamento: Equipamento
+    pessoa: Pessoa, equipamento: Equipamento, imagemUrl?: string | null
 };
 
 export default function AdminPage() {
@@ -31,11 +32,23 @@ export default function AdminPage() {
     const [editData, setEditData] = useState("");
     const [editQuantidade, setEditQuantidade] = useState("");
     const [editObs, setEditObs] = useState("");
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     // Estado da Senha
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [passwordInput, setPasswordInput] = useState("");
     const [authError, setAuthError] = useState("");
+    const [isCheckingAuth, setIsCheckingAuth] = useState(false);
+
+    // Estados de Recuperação
+    const [showRecovery, setShowRecovery] = useState(false);
+    const [recoveryPin, setRecoveryPin] = useState("");
+    const [recoveryNewPass, setRecoveryNewPass] = useState("");
+    const [recoveryStatus, setRecoveryStatus] = useState({ error: "", success: "" });
+
+    // Estados de Alteração de Senha (dentro do painel)
+    const [changePassStatus, setChangePassStatus] = useState({ error: "", success: "" });
+    const [passForm, setPassForm] = useState({ atual: "", nova: "", pin: "" });
 
     useEffect(() => {
         // Apenas carrega dados se estiver autenticado
@@ -98,14 +111,45 @@ export default function AdminPage() {
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
-        // Senha simples mockada para o protótipo
-        if (passwordInput === "admin123") {
-            setIsAuthenticated(true);
-            setAuthError("");
-        } else {
-            setAuthError("Senha incorreta. Tente novamente.");
-            setPasswordInput("");
-        }
+        setIsCheckingAuth(true);
+        startTransition(async () => {
+            const valid = await verifyAdminPassword(passwordInput);
+            if (valid) {
+                setIsAuthenticated(true);
+                setAuthError("");
+            } else {
+                setAuthError("Senha incorreta. Tente novamente.");
+                setPasswordInput("");
+            }
+            setIsCheckingAuth(false);
+        });
+    };
+
+    const handleRecovery = (e: React.FormEvent) => {
+        e.preventDefault();
+        startTransition(async () => {
+            const res = await verifyPinAndResetPassword(recoveryPin, recoveryNewPass);
+            if (res.error) {
+                setRecoveryStatus({ error: res.error, success: "" });
+            } else {
+                setRecoveryStatus({ error: "", success: "Senha redefinida com sucesso! Faça o login." });
+                setTimeout(() => { setShowRecovery(false); setRecoveryStatus({ error: "", success: "" }); }, 2000);
+            }
+        });
+    };
+
+    const handleChangePassword = (e: React.FormEvent) => {
+        e.preventDefault();
+        startTransition(async () => {
+            const res = await changeAdminPassword(passForm.atual, passForm.nova, passForm.pin);
+            if (res.error) {
+                setChangePassStatus({ error: res.error, success: "" });
+            } else {
+                setChangePassStatus({ error: "", success: "Configurações atualizadas com sucesso!" });
+                setPassForm({ atual: "", nova: "", pin: "" });
+                setTimeout(() => setChangePassStatus({ error: "", success: "" }), 3000);
+            }
+        });
     };
 
     if (!isAuthenticated) {
@@ -120,21 +164,37 @@ export default function AdminPage() {
                         <h2 className="text-2xl font-bold text-slate-900 mb-2">Área Restrita</h2>
                         <p className="text-slate-600 text-sm mb-6">Digite a senha para acessar as configurações.</p>
 
-                        <form onSubmit={handleLogin} className="space-y-4">
-                            <div>
-                                <input
-                                    type="password"
-                                    value={passwordInput}
-                                    onChange={(e) => setPasswordInput(e.target.value)}
-                                    placeholder="Senha de acesso"
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#006fb3]/50 text-center tracking-widest"
-                                />
-                            </div>
-                            {authError && <p className="text-red-400 text-sm">{authError}</p>}
-                            <button className="w-full bg-[#006fb3] hover:bg-[#005a96] text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-[#006fb3]/30">
-                                Entrar
-                            </button>
-                        </form>
+                        {showRecovery ? (
+                            <form onSubmit={handleRecovery} className="space-y-4">
+                                <div>
+                                    <input type="text" value={recoveryPin} onChange={(e) => setRecoveryPin(e.target.value)} placeholder="PIN de Recuperação (ex: 0000)" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#006fb3]/50 text-center tracking-widest mb-3" />
+                                    <input type="password" value={recoveryNewPass} onChange={(e) => setRecoveryNewPass(e.target.value)} placeholder="Criar Nova Senha" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#006fb3]/50 text-center tracking-widest" />
+                                </div>
+                                {recoveryStatus.error && <p className="text-red-400 text-sm">{recoveryStatus.error}</p>}
+                                {recoveryStatus.success && <p className="text-emerald-500 text-sm font-bold">{recoveryStatus.success}</p>}
+                                <button disabled={isPending} className="w-full bg-[#006fb3] hover:bg-[#005a96] disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-[#006fb3]/30">
+                                    {isPending ? "Processando..." : "Redefinir Senha"}
+                                </button>
+                                <button type="button" onClick={() => setShowRecovery(false)} className="mx-auto block text-sm text-slate-500 hover:text-slate-700 mt-4 transition-colors">Voltar para o Login</button>
+                            </form>
+                        ) : (
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <div>
+                                    <input
+                                        type="password"
+                                        value={passwordInput}
+                                        onChange={(e) => setPasswordInput(e.target.value)}
+                                        placeholder="Senha de acesso"
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#006fb3]/50 text-center tracking-widest"
+                                    />
+                                </div>
+                                {authError && <p className="text-red-400 text-sm">{authError}</p>}
+                                <button disabled={isCheckingAuth} className="w-full bg-[#006fb3] hover:bg-[#005a96] disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-[#006fb3]/30">
+                                    {isCheckingAuth ? "Verificando..." : "Entrar"}
+                                </button>
+                                <button type="button" onClick={() => setShowRecovery(true)} className="mx-auto block text-sm text-slate-500 hover:text-slate-700 mt-4 transition-colors">Esqueci a Senha</button>
+                            </form>
+                        )}
                     </div>
                 </div>
             </div>
@@ -258,6 +318,36 @@ export default function AdminPage() {
                 </section>
             </div>
 
+            {/* Painel de Configurações de Segurança */}
+            <section className="bg-white rounded-2xl p-6 border border-slate-200 shadow-lg relative mt-8">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-3 bg-slate-100 rounded-xl text-slate-600">
+                        <Settings className="w-6 h-6" />
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900">Configurações de Segurança</h2>
+                </div>
+
+                <form onSubmit={handleChangePassword} className="grid md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Senha Atual</label>
+                        <input type="password" value={passForm.atual} onChange={e => setPassForm({ ...passForm, atual: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-slate-900" required />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Nova Senha</label>
+                        <input type="password" value={passForm.nova} onChange={e => setPassForm({ ...passForm, nova: e.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-slate-900" required />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Novo PIN (Recuperação)</label>
+                        <input type="text" value={passForm.pin} onChange={e => setPassForm({ ...passForm, pin: e.target.value })} placeholder="Padrão: 0000" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-slate-900" />
+                    </div>
+                    <button disabled={isPending} className="bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white px-5 py-2 rounded-xl font-medium transition-colors h-[42px]">
+                        {isPending ? "Salvando..." : "Salvar Alterações"}
+                    </button>
+                    {changePassStatus.error && <p className="text-red-500 text-sm md:col-span-4">{changePassStatus.error}</p>}
+                    {changePassStatus.success && <p className="text-emerald-500 text-sm md:col-span-4 font-bold">{changePassStatus.success}</p>}
+                </form>
+            </section>
+
             {/* Painel Histórico de Abastecimentos */}
             <section className="bg-white rounded-2xl p-6 border border-slate-200 shadow-lg relative mt-8">
                 <div className="flex items-center gap-3 mb-6">
@@ -276,13 +366,14 @@ export default function AdminPage() {
                                 <th className="pb-3 font-medium">Equipamento</th>
                                 <th className="pb-3 font-medium">Litros</th>
                                 <th className="pb-3 font-medium">Observações</th>
+                                <th className="pb-3 font-medium text-center">Comprovante</th>
                                 <th className="pb-3 font-medium text-right pr-2">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             {abastecimentos.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="py-8 text-center text-slate-500">
+                                    <td colSpan={7} className="py-8 text-center text-slate-500">
                                         Nenhum registro encontrado.
                                     </td>
                                 </tr>
@@ -302,6 +393,7 @@ export default function AdminPage() {
                                             <td className="py-3">
                                                 <input type="text" value={editObs} onChange={e => setEditObs(e.target.value)} className="bg-white text-sm text-slate-900 p-2 rounded-lg border border-slate-300 w-full" />
                                             </td>
+                                            <td className="py-3 text-center text-slate-400 text-sm">-</td>
                                             <td className="py-3 text-right pr-2 flex justify-end gap-2">
                                                 <button onClick={() => setEditingId(null)} className="p-2 text-slate-600 hover:text-slate-900 bg-slate-200 hover:bg-slate-300 rounded-lg">
                                                     <X className="w-4 h-4" />
@@ -318,6 +410,25 @@ export default function AdminPage() {
                                             <td className="py-4 text-slate-900">{abs.equipamento?.nome}</td>
                                             <td className="py-4 font-bold text-[#006fb3]">{abs.quantidade.toFixed(2)} L</td>
                                             <td className="py-4 text-slate-500 text-sm truncate max-w-xs">{abs.observacoes || "-"}</td>
+                                            <td className="py-4 text-center">
+                                                {abs.imagemUrl ? (
+                                                    <div className="relative group/img inline-block cursor-pointer">
+                                                        <button
+                                                            onClick={() => setSelectedImage(abs.imagemUrl!)}
+                                                            className="text-[#006fb3] hover:text-[#faa954] hover:underline transition-colors text-sm font-medium flex items-center gap-1 justify-center"
+                                                        >
+                                                            Ver Foto
+                                                        </button>
+                                                        <div className="absolute bottom-full right-0 mb-2 hidden group-hover/img:block z-[60] pointer-events-none">
+                                                            <div className="bg-white p-2 rounded-xl shadow-2xl border border-slate-200">
+                                                                <img src={abs.imagemUrl} alt="Comprovante" className="max-w-[250px] max-h-[250px] object-cover rounded-lg" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-300 text-sm">-</span>
+                                                )}
+                                            </td>
                                             <td className="py-4 text-right pr-2">
                                                 <div className="flex justify-end gap-2">
                                                     <button onClick={() => handleEditClick(abs)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-slate-200 rounded-lg transition-colors">
@@ -336,6 +447,31 @@ export default function AdminPage() {
                     </table>
                 </div>
             </section>
+
+            {/* Modal de Imagem Ampliada */}
+            {selectedImage && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div
+                        className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            className="absolute -top-12 right-0 bg-white/10 hover:bg-white/30 text-white rounded-full p-2 backdrop-blur-md transition-colors"
+                            onClick={() => setSelectedImage(null)}
+                        >
+                            <X className="w-8 h-8" />
+                        </button>
+                        <img
+                            src={selectedImage}
+                            alt="Comprovante Ampliado"
+                            className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

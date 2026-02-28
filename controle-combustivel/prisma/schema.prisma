@@ -1,7 +1,6 @@
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 generator client {
@@ -40,4 +39,10 @@ model Abastecimento {
 
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+}
+
+model Config {
+  id    String @id @default(cuid())
+  chave String @unique
+  valor String
 }

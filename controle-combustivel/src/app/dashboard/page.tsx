@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { Navigation } from "@/components/Navigation";
-import { AreaChart as AreaChartIcon, BarChart3, Droplet, Users, Loader2 } from "lucide-react";
+import { AreaChart as AreaChartIcon, BarChart3, Droplet, Users, Loader2, X } from "lucide-react";
 import { getAbastecimentos, getDashboardMetrics, getChartData } from "@/app/actions";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -11,7 +11,8 @@ type Abastecimento = {
     data: Date;
     quantidade: number;
     equipamento: { nome: string };
-    pessoa: { nome: string, equipe: string }
+    pessoa: { nome: string, equipe: string };
+    imagemUrl?: string | null;
 };
 
 export default function DashboardPage() {
@@ -28,6 +29,7 @@ export default function DashboardPage() {
     const currentYearStr = new Date().getFullYear().toString();
 
     const [isPending, startTransition] = useTransition();
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     useEffect(() => {
         startTransition(async () => {
@@ -147,12 +149,13 @@ export default function DashboardPage() {
                                 <th className="pb-3 font-medium">Equipamento</th>
                                 <th className="pb-3 font-medium">Responsável</th>
                                 <th className="pb-3 font-medium text-right pr-2">Volume</th>
+                                <th className="pb-3 font-medium text-center">Comprovante</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredTableData.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="py-8 text-center text-slate-500">
+                                    <td colSpan={5} className="py-8 text-center text-slate-500">
                                         Nenhum abastecimento registrado neste período.
                                     </td>
                                 </tr>
@@ -171,12 +174,56 @@ export default function DashboardPage() {
                                             {row.quantidade.toFixed(2)} L
                                         </span>
                                     </td>
+                                    <td className="py-4 text-center">
+                                        {row.imagemUrl ? (
+                                            <div className="relative group/img inline-block cursor-pointer">
+                                                <button
+                                                    onClick={() => setSelectedImage(row.imagemUrl!)}
+                                                    className="text-[#006fb3] hover:text-[#faa954] hover:underline transition-colors text-sm font-medium flex items-center gap-1 justify-center"
+                                                >
+                                                    Ver Foto
+                                                </button>
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/img:block z-50 pointer-events-none">
+                                                    <div className="bg-white p-2 rounded-xl shadow-2xl border border-slate-200">
+                                                        <img src={row.imagemUrl} alt="Comprovante" className="max-w-[250px] max-h-[300px] object-cover rounded-lg" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <span className="text-slate-300 text-sm">-</span>
+                                        )}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
             </section>
+
+            {/* Modal de Imagem Ampliada */}
+            {selectedImage && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm"
+                    onClick={() => setSelectedImage(null)}
+                >
+                    <div
+                        className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center animate-in fade-in zoom-in duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            className="absolute -top-12 right-0 bg-white/10 hover:bg-white/30 text-white rounded-full p-2 backdrop-blur-md transition-colors"
+                            onClick={() => setSelectedImage(null)}
+                        >
+                            <X className="w-8 h-8" />
+                        </button>
+                        <img
+                            src={selectedImage}
+                            alt="Comprovante Ampliado"
+                            className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -109,7 +109,7 @@ export default function Home() {
           <div className="absolute inset-0 bg-emerald-50/90 backdrop-blur-md z-20 flex flex-col items-center justify-center text-center p-6 transition-all">
             <CheckCircle2 className="w-20 h-20 text-emerald-500 mb-4 animate-bounce" />
             <h2 className="text-3xl font-bold text-emerald-900 mb-2">Sucesso!</h2>
-            <p className="text-emerald-700">Abastecimento registrado com sucesso no sistema.</p>
+            <p className="text-emerald-700">Registro realizado.</p>
           </div>
         )}
 

@@ -194,3 +194,58 @@ export async function getChartData() {
         litrosPorEquipamento: chartEquipamentos
     };
 }
+
+// --- Auth / Config ---
+export async function verifyAdminPassword(senhaAberta: string) {
+    let configSenha = await prisma.config.findUnique({ where: { chave: 'admin_pass' } });
+    if (!configSenha) {
+        // Inicializa se não existir com "admin123"
+        configSenha = await prisma.config.create({ data: { chave: 'admin_pass', valor: 'admin123' } });
+        await prisma.config.create({ data: { chave: 'admin_pin', valor: '0000' } }); // PIN de recuperação padrão
+    }
+    return configSenha.valor === senhaAberta;
+}
+
+export async function changeAdminPassword(senhaAtual: string, novaSenha: string, novoPin?: string) {
+    if (!novaSenha || novaSenha.length < 4) return { error: "Nova senha muito curta." };
+
+    const configSenha = await prisma.config.findUnique({ where: { chave: 'admin_pass' } });
+    if (configSenha?.valor !== senhaAtual && configSenha?.valor !== undefined) {
+        return { error: "Senha atual incorreta." };
+    }
+
+    await prisma.config.upsert({
+        where: { chave: 'admin_pass' },
+        update: { valor: novaSenha },
+        create: { chave: 'admin_pass', valor: novaSenha }
+    });
+
+    if (novoPin && novoPin.length >= 4) {
+        await prisma.config.upsert({
+            where: { chave: 'admin_pin' },
+            update: { valor: novoPin },
+            create: { chave: 'admin_pin', valor: novoPin }
+        });
+    }
+
+    return { success: true };
+}
+
+export async function verifyPinAndResetPassword(pin: string, novaSenha: string) {
+    if (!novaSenha || novaSenha.length < 4) return { error: "Nova senha muito curta." };
+    const configPin = await prisma.config.findUnique({ where: { chave: 'admin_pin' } });
+
+    // Se não existir o pino, consideramos '0000'
+    const currentPin = configPin ? configPin.valor : '0000';
+    if (currentPin !== pin) {
+        return { error: "PIN de recuperação incorreto." };
+    }
+
+    await prisma.config.upsert({
+        where: { chave: 'admin_pass' },
+        update: { valor: novaSenha },
+        create: { chave: 'admin_pass', valor: novaSenha }
+    });
+
+    return { success: true };
+}
